@@ -85,6 +85,12 @@ def native_recipe(source):
  env['PKG_CONFIG']=str(bin_dir/'pkgconf')
 '''
     code = code[:start] + host + code[end:]
+    code = replace_once(code,
+                        "env['CC_FOR_BUILD']=shutil.which('clang') if sdk else shutil.which('gcc')",
+                        "env['CC_FOR_BUILD']=os.environ['M4_NATIVE_CC']")
+    code = replace_once(code,
+                        "env['CXX_FOR_BUILD']=shutil.which('clang++') if sdk else shutil.which('g++')",
+                        "env['CXX_FOR_BUILD']=os.environ['M4_NATIVE_CXX']")
     # LLVM ar retains the Darwin archive/MRI support expected by the recipe.
     # The existing recipe supplies target, SDK and deployment flags to Clang.
     compile(code, str(recipe), "exec")
@@ -243,6 +249,15 @@ def build_media(source, jobs):
     sys.path.insert(0, str(recipe.parent))
     namespace = {"__file__": str(recipe), "__name__": "m4_macos_full_media"}
     exec(compile(code, str(recipe), "exec"), namespace)
+    mac_sdk = capture("xcrun", "--sdk", "macosx", "--show-sdk-path")
+    host_flags = ["-target", platform.machine() + "-apple-macos" + platform.mac_ver()[0],
+                  "-isysroot", mac_sdk]
+    for key, compiler, name in (("M4_NATIVE_CC", "clang", "mac-cc"),
+                                ("M4_NATIVE_CXX", "clang++", "mac-cxx")):
+        wrapper = WORK / "mac-host/bin" / name
+        namespace["write_compiler_wrapper"](wrapper, capture("xcrun", "--find", compiler),
+                                              host_flags, [])
+        os.environ[key] = str(wrapper)
     cache = WORK / "media-cache" / digest(__file__)[:12]
     prefix = namespace["prepare"](recipe.parent, cache, sdk, jobs)
     config = prefix / "FullMediaPaths.json"
