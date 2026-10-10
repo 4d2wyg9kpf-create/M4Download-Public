@@ -224,9 +224,13 @@ def prepare_native_sdk():
     link(sdk_path, developer / "Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.0.sdk")
     toolchain = developer / "Toolchains/XcodeDefault.xctoolchain/usr"
     link(resource, toolchain / "lib/swift/clang")
-    cxx_headers = clang.parent.parent / "include/c++/v1"
-    if not (cxx_headers / "vector").is_file():
-        raise RuntimeError("The native Xcode C++ headers are required")
+    cxx_candidates = [sdk_path / "usr/include/c++/v1",
+                      clang.resolve().parent.parent / "include/c++/v1"]
+    cxx_headers = next((path for path in cxx_candidates if (path / "vector").is_file()), None)
+    if cxx_headers is None:
+        raise RuntimeError("The native Xcode C++ headers are required: " +
+                           ", ".join(map(str, cxx_candidates)))
+    print("Native SDK:", sdk_path, "C++ headers:", cxx_headers, flush=True)
     link(cxx_headers, toolchain / "include/c++/v1")
     link(linker, sdk / "toolset/bin/ld64.lld")
     (sdk / "darwin-sdk-version.txt").write_text(capture("xcodebuild", "-version") + "\n")
