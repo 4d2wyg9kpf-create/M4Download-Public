@@ -1,0 +1,83 @@
+name: Build M4Download IPA
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m4download-public-ipa
+  cancel-in-progress: false
+
+jobs:
+  iphone:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'v0.9.10-74-source'
+    runs-on: xcode-27
+    timeout-minutes: 180
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - name: Check out build automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+
+      - name: Verify native SDK and prepare host tools
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          python -m pip install cmake==3.31.6 ninja==1.11.1.3 meson==1.7.2
+          if ! brew list --versions llvm@20 > /dev/null; then
+            brew install llvm@20
+          fi
+          if ! command -v pkg-config > /dev/null; then
+            brew install pkgconf
+          fi
+          printf 'XCODE_VERSION=%s\n' "$(xcodebuild -version | tr '\n' '-')" >> "$GITHUB_ENV"
+
+      - name: Restore codec build progress
+        id: codecs
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: .build/media-cache
+          key: ios27-codecs-${{ env.XCODE_VERSION }}-${{ hashFiles('ci/source.json', 'ci/build_macos.py') }}
+
+      - name: Compile codecs, app and unsigned device IPA
+        run: python ci/build_macos.py --jobs 2
+
+      - name: Save codec build progress
+        if: always() && steps.codecs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: .build/media-cache
+          key: ios27-codecs-${{ env.XCODE_VERSION }}-${{ hashFiles('ci/source.json', 'ci/build_macos.py') }}
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: M4Download-0.9.10-74-unsigned
+          path: output/*
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: M4Download-build-diagnostics-${{ github.run_id }}
+          path: |
+            .build/media-cache/**/build.log
+            .build/media-cache/**/ffbuild/config.log
+            .build/source/**/build/ios/**/*.log
+          if-no-files-found: ignore
+          retention-days: 3
