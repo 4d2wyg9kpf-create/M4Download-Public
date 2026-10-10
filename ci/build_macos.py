@@ -189,6 +189,12 @@ def sync_xcode_sources(source):
 
 
 def adapt_packager(source):
+    # The Xcode app copies MediaRuntime directly into its main bundle. SwiftPM's
+    # generated Bundle.module accessor does not exist for this app target.
+    playback = source / "M4Download.swiftpm/Sources/AppModule/Player/PlaybackWorker.swift"
+    playback.write_text(replace_once(playback.read_text(),
+                                    'Bundle.module.url(forResource: "MediaRuntime", withExtension: nil)',
+                                    'Bundle.main.url(forResource: "MediaRuntime", withExtension: nil)'))
     script = source / "Scripts/build_ios.py"
     code = script.read_text()
     code = replace_once(code, 'set(info.get("UIBackgroundModes", [])) - {"processing"}',
