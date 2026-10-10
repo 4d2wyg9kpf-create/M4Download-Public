@@ -218,6 +218,8 @@ def prepare_native_sdk():
     binaries = {"clang": clang, "clang++": clangxx}
     for name in ("llvm-ar", "llvm-ranlib", "llvm-nm", "llvm-strip"):
         binaries[name] = llvm_prefix / "bin" / name
+    # CMake's AppleClang recipes pass Apple-specific ranlib options.
+    binaries["llvm-ranlib"] = Path(capture("xcrun", "--find", "ranlib"))
     host_bin = WORK / "mac-host/bin"
     for name, binary in binaries.items():
         if not binary.is_file():
@@ -258,7 +260,9 @@ def build_media(source, jobs):
         namespace["write_compiler_wrapper"](wrapper, capture("xcrun", "--find", compiler),
                                               host_flags, [])
         os.environ[key] = str(wrapper)
-    cache = WORK / "media-cache" / digest(__file__)[:12]
+    # Package stamps validate sources, options and dependencies. Bump this
+    # generation in source.json when changing target/compiler/SDK flags.
+    cache = WORK / "media-cache" / SPEC["codec_cache_generation"]
     prefix = namespace["prepare"](recipe.parent, cache, sdk, jobs)
     config = prefix / "FullMediaPaths.json"
     shutil.copy2(config, source / "M4Download.swiftpm/Vendor/MediaCore/FullMediaPaths.json")

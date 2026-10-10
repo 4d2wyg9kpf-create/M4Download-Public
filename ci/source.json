@@ -4,5 +4,6 @@
   "asset": "M4Download-0.9.10-74-source.zip",
   "release": "v0.9.10-74-source",
   "root": "M4Download-0.9.10",
-  "sha256": "0bc1759ee92e09529f19def714a3f6046fdce27e243677ae3454ec1ca32089ce"
+  "sha256": "0bc1759ee92e09529f19def714a3f6046fdce27e243677ae3454ec1ca32089ce",
+  "codec_cache_generation": "native-macos-v1"
 }
