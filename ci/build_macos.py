@@ -91,6 +91,9 @@ def native_recipe(source):
     code = replace_once(code,
                         "env['CXX_FOR_BUILD']=shutil.which('clang++') if sdk else shutil.which('g++')",
                         "env['CXX_FOR_BUILD']=os.environ['M4_NATIVE_CXX']")
+    # HarfBuzz otherwise exports the macOS-only ApplicationServices framework.
+    code = replace_once(code, "build('harfbuzz','cmake',['-DHB_HAVE_FREETYPE=ON'",
+                        "build('harfbuzz','cmake',['-DHB_IOS=ON','-DHB_HAVE_FREETYPE=ON'")
     # LLVM ar retains the Darwin archive/MRI support expected by the recipe.
     # The existing recipe supplies target, SDK and deployment flags to Clang.
     compile(code, str(recipe), "exec")
